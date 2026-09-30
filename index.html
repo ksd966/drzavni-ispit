@@ -72,6 +72,7 @@
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
 html{background:var(--bg);-webkit-text-size-adjust:100%;touch-action:manipulation}
+body.locked{position:fixed;left:0;right:0;overflow:hidden}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea{-webkit-user-select:text;user-select:text}
 button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
@@ -300,8 +301,8 @@ input.field:focus,textarea.field:focus{outline:none;border-color:var(--accent)}
 .sw>span svg{width:20px;height:20px}
 .sw input{padding-left:44px}
 /* sheet */
-.scrim{position:fixed;inset:0;background:rgba(6,14,12,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
-.sheet{width:100%;max-width:640px;max-height:90vh;overflow:auto;background:var(--bg);border-radius:22px 22px 0 0;padding:10px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;animation:up .25s cubic-bezier(.2,.8,.2,1)}
+.scrim{position:fixed;inset:0;background:rgba(6,14,12,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .2s;overscroll-behavior:contain}
+.sheet{width:100%;max-width:640px;max-height:90vh;max-height:90dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:var(--bg);border-radius:22px 22px 0 0;padding:10px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;animation:up .25s cubic-bezier(.2,.8,.2,1)}
 .sheet .grab{width:44px;height:5px;border-radius:99px;background:var(--line);margin:4px auto 2px;flex:none}
 @keyframes up{from{transform:translateY(40px);opacity:.4}} @keyframes fade{from{opacity:0}}
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
@@ -705,21 +706,22 @@ function mixByArea(n,pool){
 /* ============ router ============ */
 const TABS=[["home","Danas",I.home],["test","Test",I.test],["cards","Vežbanje",I.cards],["learn","Učenje",I.book],["search","Pretraga",I.search]];
 const TABOF={quiz:"test",results:"test",deck:"cards",stats:"home"};
-let current="home", quiz=null, fcs=null, timerInt=null, lastResult=null;
+let current="home", quiz=null, fcs=null, timerInt=null, lastResult=null, lockY=0;
+function scrollToY(y){ if(document.body.classList.contains("locked")) lockY=y; else window.scrollTo(0,y) }
 function updateTabs(){
   const el=$("#tabs"); const act=TABOF[current]||current; const due=dueItems().length;
   el.innerHTML=TABS.map(([k,l,ic])=>`<button data-tab="${k}" ${act===k?'aria-current="page"':""}><span class="pill">${ic}${k==="cards"&&due?`<span class="cnt notr">${due>99?"99+":due}</span>`:""}</span>${l}</button>`).join("");
-  el.querySelectorAll("button").forEach(b=>b.onclick=()=>go(b.dataset.tab)); applyScript(el);
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(current===b.dataset.tab&&window.scrollY>0){window.scrollTo({top:0,behavior:"smooth"});return} go(b.dataset.tab) }); applyScript(el);
 }
 function go(tab,opts){
   opts=opts||{};
   if(timerInt&&tab!=="quiz"){clearInterval(timerInt);timerInt=null}
   if(tab!=="quiz"&&tab!=="deck")keepAwake(false);
-  const same=current===tab; current=tab; updateTabs(); const v=$("#view"); const y=window.scrollY;
+  const same=current===tab; current=tab; updateTabs(); const v=$("#view"); const y=document.body.classList.contains("locked")?lockY:window.scrollY;
   v.innerHTML=""; if(!opts.keep){v.classList.remove("fade-in"); void v.offsetWidth; v.classList.add("fade-in")}
   ({home:viewHome,stats:viewStats,test:viewTestMenu,quiz:viewQuiz,results:viewResults,cards:viewCardsMenu,deck:viewDeck,learn:viewLearn,search:viewSearch}[tab]||viewHome)(v,opts);
   applyScript(v);
-  if(opts.keep&&same) window.scrollTo(0,y); else window.scrollTo(0,0);
+  if(opts.keep&&same) scrollToY(y); else scrollToY(0);
 }
 window.addEventListener("scroll",()=>$("#top").classList.toggle("scrolled",scrollY>4),{passive:true});
 
@@ -957,7 +959,7 @@ function viewQuiz(v){
     opts.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{ if(ans)return; const k=+b.dataset.k;
       if(!multi) submitMc(it,[k]); else {quiz.sel=quiz.sel.includes(k)?quiz.sel.filter(x=>x!==k):quiz.sel.concat(k);paint();if(chk)chk.disabled=!quiz.sel.length}});
     paint();
-    if(ans&&!quiz.sim&&quiz.justAnswered){ quiz.justAnswered=false; opts.querySelectorAll(".opt.ok").forEach(b=>b.classList.add("pop")); if(!ans.ok) opts.querySelectorAll(".opt.no").forEach(b=>b.classList.add("shake")) }
+    if(ans&&!quiz.sim&&quiz.justAnswered){ quiz.justAnswered=false; opts.querySelectorAll(".opt.ok").forEach(b=>b.classList.add("pop")); if(!ans.ok) opts.querySelectorAll(".opt.no").forEach(b=>b.classList.add("shake")); revealFeedback(v) }
     if(multi&&!ans){chk=h(`<button class="btn primary block" disabled>Proveri</button>`);chk.onclick=()=>submitMc(it,quiz.sel.slice());card.append(chk)}
     if(!ans) card.append(h(`<div class="muted small kbdhint">Tastatura: <span class="kbd">A</span>–<span class="kbd">D</span> ili <span class="kbd">1</span>–<span class="kbd">4</span>, zatim <span class="kbd">Enter</span></div>`));
   }
@@ -969,6 +971,11 @@ function viewQuiz(v){
     nx.querySelector("button").onclick=next; v.append(nx);
   }
   if(quiz.timed){ tickTimer(); clearInterval(timerInt); timerInt=setInterval(tickTimer,1000) }
+}
+function revealFeedback(v){ // posle odgovora objašnjenje mora da se vidi iznad dugmeta „Sledeće pitanje”
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ const fb=v.querySelector(".fb"); if(!fb)return; const r=fb.getBoundingClientRect();
+    const foot=v.querySelector(".sticky-foot"); const limit=(foot?foot.getBoundingClientRect().top:innerHeight-90)-12;
+    if(r.bottom>limit){ const top=document.querySelector("header.top"); const maxUp=r.top-((top?top.getBoundingClientRect().bottom:0)+8); window.scrollBy({top:Math.max(0,Math.min(r.bottom-limit,maxUp)),behavior:"smooth"}) } }));
 }
 function tickTimer(){const el=document.getElementById("timer"); if(!quiz||!el)return; const left=Math.max(0,quiz.timed-Math.floor((Date.now()-quiz.start)/1000));
   el.textContent=String(Math.floor(left/60)).padStart(2,"0")+":"+String(left%60).padStart(2,"0"); el.classList.toggle("low",left<60); if(left<=0){clearInterval(timerInt);timerInt=null;toast("Vreme je isteklo");finishQuiz()}}
@@ -1096,7 +1103,7 @@ function viewDeck(v){
     if(!multi) submit([k]); else {fcs.sel=fcs.sel.includes(k)?fcs.sel.filter(x=>x!==k):fcs.sel.concat(k); paint(); if(chk)chk.disabled=!fcs.sel.length} });
   if(multi&&!ans){chk=h(`<button class="btn primary block" disabled>Proveri</button>`); chk.onclick=()=>submit(fcs.sel.slice()); card.append(chk)}
   if(ans){
-    if(ans.fresh){ ans.fresh=false; opts.querySelectorAll(".opt.ok").forEach(b=>b.classList.add("pop")); if(!ans.ok) opts.querySelectorAll(".opt.no").forEach(b=>b.classList.add("shake")) }
+    if(ans.fresh){ ans.fresh=false; opts.querySelectorAll(".opt.ok").forEach(b=>b.classList.add("pop")); if(!ans.ok) opts.querySelectorAll(".opt.no").forEach(b=>b.classList.add("shake")); revealFeedback(v) }
     const lvl=(S.st[it.id]||{b:0}).b||0;
     const fb=h(`<div class="fb ${ans.ok?"ok":"no"}"><div class="t">${ans.ok?I.check+" Tačno":I.x+" Netačno – vratiće se za nekoliko pitanja"}</div>${mcExplain(it,ans.ok)}${noteHTML(it)}${it.num?`<div class="src">${esc(it.srcText||"")}</div>`:srcHTML(it)}<div class="row" style="justify-content:space-between"><div class="boxes" aria-label="Nivo znanja ${lvl} od 5">${[1,2,3,4,5].map(n=>`<i class="${lvl>=n?"on":""}"></i>`).join("")}</div>${it.num?"":`<button class="link quiet" id="rep">${I.alert}Prijavi grešku</button>`}</div></div>`);
     const rp=fb.querySelector("#rep"); if(rp) rp.onclick=()=>reportSheet(it);
@@ -1392,6 +1399,12 @@ document.addEventListener("keydown",e=>{
     else if(k==="enter"||k===" "){const b=document.querySelector(".sticky-foot .btn")||document.querySelector(".qcard .btn.primary:not([disabled])"); if(b){b.click();e.preventDefault()}}
   }
 });
+
+/* ============ zaključavanje skrola ispod otvorenog prozora ============ */
+new MutationObserver(()=>{ const open=!!document.querySelector(".scrim"), locked=document.body.classList.contains("locked");
+  if(open&&!locked){ lockY=window.scrollY; document.body.style.top=(-lockY)+"px"; document.body.classList.add("locked") }
+  else if(!open&&locked){ document.body.classList.remove("locked"); document.body.style.top=""; window.scrollTo(0,lockY) }
+}).observe(document.body,{childList:true});
 
 /* ============ boot ============ */
 $("#btnSettings").innerHTML=I.gear+'<span class="syncdot"></span>'; $("#btnSettings").onclick=settings;
