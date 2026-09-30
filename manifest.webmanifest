@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Državni ispit – medicinska sestra-tehničar",
+  "short_name": "Državni ispit",
+  "description": "Testovi, vežbanje i rezimei za stručni ispit medicinske sestre-tehničara. Radi i bez interneta.",
+  "lang": "sr",
+  "start_url": "./?izvor=aplikacija",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF3F2",
+  "theme_color": "#EEF3F2",
+  "categories": ["education", "medical"],
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
