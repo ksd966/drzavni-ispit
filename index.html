@@ -50,6 +50,7 @@
   --ecg:#D8465A; --ecg-soft:#FBE3E6; --grid:rgba(216,70,90,.10);
   --good:#1E8A4B; --good-soft:#DDF3E5; --bad:#C0392B; --bad-soft:#F9E0DC; --warn:#A8690F; --warn-soft:#FBEBCF;
   --gold:#B8860B; --gold-soft:#FAF0D2;
+  --a1:#2a78d6; --a2:#eb6834; --a3:#1baf7a; --a1-on:#FFFFFF; --a2-on:#12201E; --a3-on:#12201E; /* boje oblasti (grafikoni) */
   --shadow:0 1px 2px rgba(18,32,30,.06),0 6px 20px rgba(18,32,30,.06);
   --f-display:"Unbounded","Onest",system-ui,sans-serif; --f-body:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
   --r:16px; --z:1;
@@ -60,6 +61,7 @@
   --ecg:#FF6F82; --ecg-soft:#3A1D23; --grid:rgba(255,111,130,.07);
   --good:#56C784; --good-soft:#15301F; --bad:#F26D5E; --bad-soft:#3A1C18; --warn:#E6AD4E; --warn-soft:#352914;
   --gold:#E8C35A; --gold-soft:#332A12;
+  --a1:#3987e5; --a2:#d95926; --a3:#199e70; --a1-on:#06201C; --a2-on:#06201C; --a3-on:#06201C;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0C1413; --surface:#141F1D; --surface-2:#1A2725; --ink:#E4EEEB; --muted:#98ABA7; --line:#26352F;
@@ -67,6 +69,7 @@
   --ecg:#FF6F82; --ecg-soft:#3A1D23; --grid:rgba(255,111,130,.07);
   --good:#56C784; --good-soft:#15301F; --bad:#F26D5E; --bad-soft:#3A1C18; --warn:#E6AD4E; --warn-soft:#352914;
   --gold:#E8C35A; --gold-soft:#332A12;
+  --a1:#3987e5; --a2:#d95926; --a3:#199e70; --a1-on:#06201C; --a2-on:#06201C; --a3-on:#06201C;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -299,6 +302,35 @@ body.focus .qcard.c5 .fb,body.focus .qcard.c5 .note,body.focus .qcard.c5 .answer
 .kpi b{display:block;font-family:var(--f-display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15}
 .kpi span{font-size:13px;color:var(--muted)}
 .chart{width:100%;height:auto;display:block}
+/* statistika: ukupno + pie chart po oblastima */
+.sum-hero{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sum-hero b{font-family:var(--f-display);font-size:48px;font-weight:700;line-height:1}
+.sum-hero span{color:var(--muted);font-size:15px}
+.okbar{display:flex;gap:2px;height:12px;border-radius:99px;overflow:hidden;background:var(--surface-2)}
+.okbar i{display:block;height:100%}
+.okbar .k{background:var(--good)}.okbar .w{background:var(--bad)}
+.sum3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sum3 div{border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--surface-2)}
+.sum3 b{display:flex;align-items:center;gap:6px;font-size:22px;font-weight:700;line-height:1.2}
+.sum3 b svg{width:18px;height:18px;flex:none}
+.sum3 .ok b svg{color:var(--good)}.sum3 .no b svg{color:var(--bad)}
+.sum3 span{display:block;font-size:13px;color:var(--muted)}
+.pie-wrap{display:flex;align-items:center;gap:16px}
+.pie{width:190px;flex:none;display:block;overflow:visible}
+.pie path{stroke:var(--surface);stroke-width:2;stroke-linejoin:round;cursor:pointer;transition:opacity .2s;outline:none}
+.pie path:focus-visible{stroke:var(--ink)}
+.pie.sel path:not(.on),.pie.sel .pl:not(.on){opacity:.28}
+.pie .pl{font:700 13px/1 var(--f-body);pointer-events:none}
+.pie .c1{font:700 30px/1 var(--f-display);fill:var(--ink)}.pie .c2{font:500 12px/1 var(--f-body);fill:var(--muted)}
+.plg{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.plg button{display:grid;grid-template-columns:14px 1fr auto;column-gap:10px;row-gap:2px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;color:var(--ink);transition:opacity .2s}
+.plg button .sw{width:14px;height:14px;border-radius:4px}
+.plg button b{font-size:15px}
+.plg button .pp{font:700 16px/1 var(--f-mono)}
+.plg button small{grid-column:2 / 4;color:var(--muted);font-size:13px}
+.plg.sel button:not(.on){opacity:.45}
+.plg button.on{border-color:var(--ink)}
+@media (max-width:430px){.pie-wrap{flex-direction:column;align-items:stretch}.pie{margin:0 auto}}
 .chart text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
 .chart .v{fill:var(--ink);font-weight:600}
 .ach{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
@@ -376,7 +408,7 @@ const DATA = {"docs":["ZDR nega (bitno)","Nova pitanja NEGA (1. dec)","Najčeš�
 (function(){
 "use strict";
 /* ============ constants ============ */
-const VERSION = "3.3";
+const VERSION = "3.4";
 const PWA = true;   // true u verziji koja se instalira na telefon (docs/)
 const STANDALONE = !!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -384,7 +416,8 @@ const APP_URL = "https://ksd966.github.io/drzavni-ispit/".replace(/^\/\*.*\*\/$/
 const EXAM_DATE = new Date(2026, 9, 2); // petak, 2. oktobar 2026.
 const AREAS = {nega:"Zdravstvena nega", zastita:"Zdravstvena zaštita i radni odnosi", ustav:"Ustav"};
 const AREA_SHORT = {nega:"Nega", zastita:"Zdr. zaštita", ustav:"Ustav"};
-const AREA_COLOR = {nega:"var(--accent)", zastita:"var(--warn)", ustav:"var(--ecg)"};
+const AREA_COLOR = {nega:"var(--a1)", zastita:"var(--a2)", ustav:"var(--a3)"};
+const AREA_ON = {nega:"var(--a1-on)", zastita:"var(--a2-on)", ustav:"var(--a3-on)"};
 const ITEMS = DATA.items;
 const BYID = Object.fromEntries(ITEMS.map(i=>[i.id,i]));
 const DOCS = DATA.docs;
@@ -869,11 +902,65 @@ const ACH_=()=>[
   ["Ustavni stručnjak","80% Ustava tačno",()=>{const s=areaStats("ustav");return s.known>=s.total*.8}],
   ["Generalna proba","Simulacija sa 80% ili više",()=>S.hist.some(x=>x.mode==="sim"&&x.k>=x.n*.8)],
 ];
+/* Ukupno od kad je upisano ime + udeo oblasti (pie chart). Sve iz S.st, pa se brojevi slažu. */
+function answerStats(){
+  const per={}; Object.keys(AREAS).forEach(a=>per[a]={n:0,k:0,q:0}); let n=0,k=0,q=0;
+  Object.keys(S.st).forEach(id=>{const s=S.st[id], it=BYID[id]; if(!it||!s||!s.n)return; const a=per[it.a]?it.a:"nega", kk=Math.min(s.k||0,s.n);
+    per[a].n+=s.n; per[a].k+=kk; per[a].q++; n+=s.n; k+=kk; q++});
+  return {n,k,w:n-k,q,per};
+}
+function pctParts(vals){ // procenti koji se sabiraju u 100 (najveći ostatak)
+  const tot=vals.reduce((a,b)=>a+b,0); if(!tot)return vals.map(()=>0);
+  const raw=vals.map(x=>x*100/tot), fl=raw.map(Math.floor); let rest=100-fl.reduce((a,b)=>a+b,0);
+  raw.map((x,i)=>[x-fl[i],i]).sort((a,b)=>b[0]-a[0]).forEach(([,i])=>{if(rest>0){fl[i]++;rest--}}); return fl;
+}
+function arcPath(cx,cy,r1,r2,a0,a1){
+  const p=(r,a)=>[(cx+r*Math.cos(a)).toFixed(2),(cy+r*Math.sin(a)).toFixed(2)];
+  if(a1-a0>=Math.PI*2-1e-6){ // ceo krug
+    return `M${cx-r2} ${cy}A${r2} ${r2} 0 1 1 ${cx+r2} ${cy}A${r2} ${r2} 0 1 1 ${cx-r2} ${cy}ZM${cx-r1} ${cy}A${r1} ${r1} 0 1 0 ${cx+r1} ${cy}A${r1} ${r1} 0 1 0 ${cx-r1} ${cy}Z` }
+  const big=a1-a0>Math.PI?1:0, [x1,y1]=p(r2,a0),[x2,y2]=p(r2,a1),[x3,y3]=p(r1,a1),[x4,y4]=p(r1,a0);
+  return `M${x1} ${y1}A${r2} ${r2} 0 ${big} 1 ${x2} ${y2}L${x3} ${y3}A${r1} ${r1} 0 ${big} 0 ${x4} ${y4}Z`;
+}
+function statsOverview(v){
+  const t=answerStats(), nm=S.settings.name, prof=PROF.list[PROF.active]; const since=prof&&prof.c?new Date(prof.c):null;
+  const dstr=since?`${since.getDate()}. ${since.getMonth()+1}. ${since.getFullYear()}.`:"";
+  const pk=t.n?Math.round(t.k/t.n*100):0;
+  const sum=h(`<section class="card stack"><div><div class="eyebrow">Ukupno od početka</div><div class="small muted">${nm?`Za ime „${esc(nm)}”`:"Za ovaj profil"}${dstr?`, od <span class="notr">${dstr}</span> kad je ime upisano`:""}</div></div></section>`);
+  if(!t.n){ sum.append(h(`<div class="muted">Još nema odgovora. Kad uradiš prvi test ili vežbanje, ovde će pisati koliko je pitanja urađeno, koliko tačno i netačno i iz kojih oblasti.</div>`)); v.append(sum); return }
+  sum.append(h(`<div class="sum-hero"><b class="notr">${t.n}</b><span>${t.n%10===1&&t.n%100!==11?"urađeno pitanje":"urađenih pitanja"} (odgovora)</span></div>`));
+  sum.append(h(`<div class="okbar" role="img" aria-label="Tačno ${t.k}, netačno ${t.w}">${t.k?`<i class="k" style="width:${t.k/t.n*100}%"></i>`:""}${t.w?`<i class="w" style="width:${t.w/t.n*100}%"></i>`:""}</div>`));
+  sum.append(h(`<div class="sum3"><div class="ok"><b class="notr">${I.check}${t.k}</b><span>tačno</span><span class="notr">${pk}%</span></div><div class="no"><b class="notr">${I.x}${t.w}</b><span>netačno</span><span class="notr">${100-pk}%</span></div><div><b class="notr">${t.q}</b><span>različitih</span><span>pitanja</span></div></div>`));
+  v.append(sum);
+  // pie chart: udeo svake oblasti u svim odgovorima
+  const keys=Object.keys(AREAS), vals=keys.map(a=>t.per[a].n), pc=pctParts(vals);
+  const card=h(`<section class="card stack"><div><div class="eyebrow">Urađeno po oblastima</div><div class="small muted">Koliki deo svih odgovora je iz koje oblasti. Dodirni oblast za detalje.</div></div></section>`);
+  const cx=100,cy=100,r2=97,r1=52; let a=-Math.PI/2, paths="", labels="";
+  keys.forEach((k,i)=>{ if(!vals[i])return; const da=vals[i]/t.n*Math.PI*2, a1=a+da;
+    paths+=`<path d="${arcPath(cx,cy,r1,r2,a,a1)}" fill="${AREA_COLOR[k]}" data-a="${k}" tabindex="0" role="img" aria-label="${AREAS[k]}: ${pc[i]}%, ${vals[i]} odgovora"></path>`;
+    if(pc[i]>=7){const m=(a+a1)/2, rr=(r1+r2)/2; labels+=`<text class="pl notr" data-a="${k}" x="${(cx+rr*Math.cos(m)).toFixed(1)}" y="${(cy+rr*Math.sin(m)).toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="${AREA_ON[k]}">${pc[i]}%</text>`}
+    a=a1 });
+  const wrap=h(`<div class="pie-wrap"><svg class="pie" viewBox="0 0 200 200" role="group" aria-label="Udeo oblasti u odgovorima">${paths}${labels}<text class="c1 notr" x="100" y="96" text-anchor="middle"></text><text class="c2" x="100" y="120" text-anchor="middle"></text></svg><div class="plg"></div></div>`);
+  const svg=wrap.querySelector("svg"), lg=wrap.querySelector(".plg"), c1=svg.querySelector(".c1"), c2=svg.querySelector(".c2");
+  keys.forEach((k,i)=>{ const x=t.per[k], p=x.n?Math.round(x.k/x.n*100):0;
+    const b=h(`<button data-a="${k}" aria-pressed="false"><span class="sw" style="background:${AREA_COLOR[k]}"></span><b>${AREAS[k]}</b><span class="pp notr">${pc[i]}%</span><small>${x.n?`<span class="notr">${x.n}</span> odgovora · tačno <span class="notr">${x.k}</span> · netačno <span class="notr">${x.n-x.k}</span> · uspešnost <span class="notr">${p}%</span>`:"još nema odgovora"}</small></button>`);
+    lg.append(b)});
+  let sel=null, hov=null;
+  const paint=()=>{ const cur=hov||sel; svg.classList.toggle("sel",!!cur); lg.classList.toggle("sel",!!cur);
+    svg.querySelectorAll("path,.pl").forEach(e=>e.classList.toggle("on",e.dataset.a===cur));
+    lg.querySelectorAll("button").forEach(e=>{e.classList.toggle("on",e.dataset.a===cur); e.setAttribute("aria-pressed",String(e.dataset.a===sel))});
+    if(cur){const i=keys.indexOf(cur); c1.textContent=pc[i]+"%"; c2.textContent=AREA_SHORT[cur]} else {c1.textContent=String(t.n); c2.textContent="odgovora"}
+    if(S.settings.script==="cyr")c2.textContent=toCyr(c2.textContent) };
+  const pick=k=>{sel=sel===k?null:k; paint()};
+  svg.querySelectorAll("path").forEach(e=>{ e.onclick=()=>pick(e.dataset.a); e.onkeydown=ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();pick(e.dataset.a)}};
+    e.onpointerenter=ev=>{if(ev.pointerType==="mouse"){hov=e.dataset.a;paint()}}; e.onpointerleave=()=>{hov=null;paint()}; e.onfocus=()=>{hov=e.dataset.a;paint()}; e.onblur=()=>{hov=null;paint()} });
+  lg.querySelectorAll("button").forEach(e=>e.onclick=()=>pick(e.dataset.a));
+  paint(); card.append(wrap); v.append(card);
+}
 function viewStats(v){
   const top=h(`<div class="row"><button class="iconbtn" aria-label="Nazad">${I.back}</button><div class="h1 grow">Statistika</div></div>`);
   top.querySelector("button").onclick=()=>go("home"); v.append(top);
-  const tot=totalAnswered(); const okTot=Object.values(S.ok).reduce((a,b)=>a+b,0); const acc=tot?Math.round(okTot/tot*100):0;
-  v.append(h(`<div class="kpis"><div class="kpi"><b class="notr">${acc}%</b><span>tačnost ukupno</span></div><div class="kpi"><b class="notr">${tot}</b><span>odgovora</span></div><div class="kpi"><b class="notr">${S.hist.length}</b><span>završenih testova</span></div><div class="kpi"><b class="notr">${streak()}</b><span>dana zaredom</span></div></div>`));
+  statsOverview(v);
+  v.append(h(`<div class="kpis"><div class="kpi"><b class="notr">${S.hist.length}</b><span>završenih testova</span></div><div class="kpi"><b class="notr">${streak()}</b><span>dana zaredom</span></div></div>`));
   const days=[]; const dn=["Ned","Pon","Uto","Sre","Čet","Pet","Sub"];
   for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=dkey(d);days.push({l:i===0?"Danas":dn[d.getDay()],n:S.days[k]||0,k:S.ok[k]||0})}
   const max=Math.max(10,...days.map(d=>d.n)); const W=320,H=150,bw=30,gap=(W-7*bw)/8;
