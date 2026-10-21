@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Stručni ispit – zdravstvena nega",
-  "short_name": "Stručni ispit",
-  "description": "Priprema za medicinske sestre-tehničare: testovi, vežbanje i rezimei za stručni ispit. Radi i bez interneta.",
+  "name": "Državni ispit",
+  "short_name": "Državni ispit",
+  "description": "Priprema za državni ispit: testovi, vežbanje i rezimei. Radi i bez interneta.",
   "lang": "sr",
   "start_url": "./?izvor=aplikacija",
   "scope": "./",
