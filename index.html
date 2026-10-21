@@ -3,14 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Sestrinski državni ispit</title>
-<meta name="description" content="Testovi, vežbanje i rezimei za stručni ispit medicinske sestre-tehničara.">
+<title>Stručni ispit – zdravstvena nega</title>
+<meta name="description" content="Priprema za medicinske sestre-tehničare: testovi, vežbanje i rezimei za stručni ispit.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Stručni ispit – zdravstvena nega">
+<meta property="og:description" content="Priprema za medicinske sestre-tehničare">
+<meta property="og:url" content="https://ksd966.github.io/drzavni-ispit/">
+<meta property="og:image" content="https://ksd966.github.io/drzavni-ispit/icons/icon-512.png">
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#EEF3F2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C1413" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Državni ispit">
+<meta name="apple-mobile-web-app-title" content="Stručni ispit">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
@@ -399,7 +404,7 @@ canvas.confetti{position:fixed;inset:0;pointer-events:none;z-index:70}
   <header class="top" id="top">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="var(--accent)"/><path d="M5 18h6l2.5-6 4 12 3-9 2 3H29" fill="none" stroke="var(--accent-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div class="grow"><b id="title">Državni ispit</b><small id="subtitle">Medicinska sestra-tehničar</small></div>
+      <div class="grow"><b id="title">Stručni ispit</b><small id="subtitle">Zdravstvena nega · priprema</small></div>
     </div>
     <button class="iconbtn avbtn" id="btnProfile" aria-label="Profil"></button>
     <button class="iconbtn" id="btnStats" aria-label="Statistika"></button>
@@ -414,7 +419,7 @@ const DATA = {"docs":["ZDR nega (bitno)","Nova pitanja NEGA (1. dec)","Najčeš�
 (function(){
 "use strict";
 /* ============ constants ============ */
-const VERSION = "3.5";
+const VERSION = "3.6";
 const PWA = true;   // true u verziji koja se instalira na telefon (docs/)
 const STANDALONE = !!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -1510,7 +1515,7 @@ async function backupSave(){
   }
   const blob=new Blob([text],{type:"application/json"});
   const file=typeof File==="function"?new File([blob],name,{type:"application/json"}):null;
-  if(file&&navigator.canShare&&navigator.canShare({files:[file]})){ navigator.share({files:[file],title:"Državni ispit – napredak"}).then(()=>toast("Kopija je sačuvana"),()=>{}); return }
+  if(file&&navigator.canShare&&navigator.canShare({files:[file]})){ navigator.share({files:[file],title:"Stručni ispit – napredak"}).then(()=>toast("Kopija je sačuvana"),()=>{}); return }
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000); toast("Kopija je sačuvana");
 }
 function backupTextSheet(text){
@@ -1568,7 +1573,7 @@ function initPWA(){
   }).catch(()=>{});
   let reloading=false; navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(reloading||!navigator.serviceWorker.controller)return; reloading=true; flush(); location.reload() });
 }
-function refreshAll(){ $("#title").textContent="Državni ispit"; $("#subtitle").textContent="Medicinska sestra-tehničar"; $("#btnStats").setAttribute("aria-label","Statistika"); $("#btnSettings").setAttribute("aria-label","Podešavanja"); applyScript($("#top")); updateTabs(); if(!["quiz","deck"].includes(current))go(current,{keep:true}) }
+function refreshAll(){ $("#title").textContent="Stručni ispit"; $("#subtitle").textContent="Zdravstvena nega · priprema"; $("#btnStats").setAttribute("aria-label","Statistika"); $("#btnSettings").setAttribute("aria-label","Podešavanja"); applyScript($("#top")); updateTabs(); if(!["quiz","deck"].includes(current))go(current,{keep:true}) }
 
 /* ============ confetti ============ */
 function confetti(){

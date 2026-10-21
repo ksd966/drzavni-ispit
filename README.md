@@ -1,4 +1,4 @@
-# Državni ispit – medicinska sestra-tehničar
+# Stručni ispit – zdravstvena nega
 
 Gotova aplikacija za učenje (otvara se na https://ksd966.github.io/drzavni-ispit/).
 Na iPhone-u: otvori link u Safariju → Deli → „Dodaj na početni ekran”. Radi i bez interneta.
