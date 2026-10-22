@@ -419,7 +419,7 @@ const DATA = {"docs":["ZDR nega (bitno)","Nova pitanja NEGA (1. dec)","Najčeš�
 (function(){
 "use strict";
 /* ============ constants ============ */
-const VERSION = "3.8";
+const VERSION = "3.9";
 const PWA = true;   // true u verziji koja se instalira na telefon (docs/)
 const STANDALONE = !!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -1564,7 +1564,7 @@ function restoreSheet(){
 /* ============ instalirana aplikacija: rad bez interneta i nove verzije ============ */
 function initPWA(){
   if(!PWA)return;
-  setTimeout(()=>countUse(true),2500); window.addEventListener("online",()=>countUse(false));
+  gcLoad(); setTimeout(()=>countUse(true),2500); window.addEventListener("online",()=>countUse(false));
   try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{}) }catch(e){}
   if(!("serviceWorker" in navigator)||(location.protocol!=="https:"&&location.hostname!=="localhost"))return;
   const ready=w=>{ if(document.querySelector(".upd"))return; const b=h(`<button class="upd">Nova verzija aplikacije je spremna · <b>Osveži</b></button>`); b.onclick=()=>{flush(); w.postMessage("skip"); b.remove()}; applyScript(b); document.body.appendChild(b) };
@@ -1581,6 +1581,9 @@ function initPWA(){
    pre brojača, pa se vidi istorija od objavljivanja) · pre-brojaca · imena – svako novo ime na telefonu ·
    aktivni-GGGGMMDD – jednom dnevno po telefonu · otvaranja. Brojke: brojac.html */
 const CNT_BASE="https://abacus.jasoncameron.dev/hit/drzavni-ispit-ksd966/", CNT_KEY="skr_cnt_v1", CNT_START="20261022";
+// GoatCounter (nalog ksd996): posete po danima, odakle ljudi dolaze, telefoni – bez kolačića i ličnih podataka
+const GC_URL="https://ksd996.goatcounter.com/count";
+function gcLoad(){ if(!cntOn()||document.querySelector("script[data-goatcounter]"))return; const s=document.createElement("script"); s.async=true; s.src="https://gc.zgo.at/count.js"; s.dataset.goatcounter=GC_URL; document.head.appendChild(s) }
 let cntBusy=false;
 function ymd(t){const d=new Date(t);return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")}
 async function cntHit(k){try{const r=await fetch(CNT_BASE+k,{cache:"no-store",credentials:"omit",referrerPolicy:"no-referrer"});return r.ok}catch(e){return false}}
