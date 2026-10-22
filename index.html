@@ -373,6 +373,8 @@ details.acc .body{padding:0 16px 16px;display:flex;flex-direction:column;gap:10p
 mark{background:color-mix(in srgb,var(--warn) 30%,transparent);color:inherit;border-radius:3px;padding:0 1px}
 input.field,textarea.field{width:100%;min-height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:17px;padding:12px 14px}
 textarea.field{min-height:90px;resize:vertical}
+input.field[type=date]{-webkit-appearance:none;appearance:none;display:block;text-align:left}
+input.field[type=date]::-webkit-date-and-time-value{text-align:left}
 input.field:focus,textarea.field:focus{outline:none;border-color:var(--accent)}
 .sw{position:relative}
 .sw>span{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:20px;height:20px;color:var(--muted);display:grid}
@@ -419,12 +421,11 @@ const DATA = {"docs":["ZDR nega (bitno)","Nova pitanja NEGA (1. dec)","Najčeš�
 (function(){
 "use strict";
 /* ============ constants ============ */
-const VERSION = "3.9";
+const VERSION = "4.0";
 const PWA = true;   // true u verziji koja se instalira na telefon (docs/)
 const STANDALONE = !!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
 const APP_URL = "https://ksd966.github.io/drzavni-ispit/".replace(/^\/\*.*\*\/$/,""); // link instalirane aplikacije (upisuje build.py)
-const EXAM_DATE = new Date(2026, 9, 2); // petak, 2. oktobar 2026.
 const AREAS = {nega:"Zdravstvena nega", zastita:"Zdravstvena zaštita i radni odnosi", ustav:"Ustav"};
 const AREA_SHORT = {nega:"Nega", zastita:"Zdr. zaštita", ustav:"Ustav"};
 const AREA_COLOR = {nega:"var(--a1)", zastita:"var(--a2)", ustav:"var(--a3)"};
@@ -475,11 +476,12 @@ const I = {
   share:P+'<path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   download:P+'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>',
   upload:P+'<path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></svg>',
+  cal:P+'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   users:P+'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg>',
 };
 
 /* ============ state ============ */
-function defSettings(){return {theme:"system",script:"lat",goal:100,onlyMc:false,fs:1,name:"",onboarded:false,t:0,g:null}}
+function defSettings(){return {theme:"system",script:"lat",goal:100,onlyMc:false,fs:1,name:"",onboarded:false,t:0,g:null,exam:""}}
 function defState(){return {v:2,st:{},days:{},ok:{},hist:[],bm:{},rep:{},ct:{},quiz:null,qdone:0,settings:defSettings(),lastOpen:0,upd:0}}
 function normState(p){
   const o=Object.assign(defState(),p||{});
@@ -752,7 +754,11 @@ function mcExplain(it,ok){
   return html;
 }
 function noteHTML(it){return it.n?`<div class="note">${esc(it.n)}</div>`:""}
-function daysLeft(){const n=new Date();const a=new Date(n.getFullYear(),n.getMonth(),n.getDate());return Math.round((EXAM_DATE-a)/864e5)}
+/* datum ispita: svako ime upisuje svoj (S.settings.exam = "GGGG-MM-DD", prazno = nije upisan) */
+const DAN=["nedelja","ponedeljak","utorak","sreda","četvrtak","petak","subota"], MES=["januar","februar","mart","april","maj","jun","jul","avgust","septembar","oktobar","novembar","decembar"];
+function examDay(){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(S.settings.exam||"");return m?new Date(+m[1],+m[2]-1,+m[3]):null}
+function daysLeft(){const e=examDay(); if(!e)return null; const n=new Date();return Math.round((e-new Date(n.getFullYear(),n.getMonth(),n.getDate()))/864e5)}
+function examLabel(e){return `${DAN[e.getDay()]}, ${e.getDate()}. ${MES[e.getMonth()]}${e.getFullYear()!==new Date().getFullYear()?` ${e.getFullYear()}.`:""}`}
 function poolStats(pool){let k=0,sn=0; pool.forEach(i=>{const s=S.st[i.id]; if(s&&s.n){sn++; if(s.l===1)k++;}}); return {total:pool.length,known:k,seen:sn}}
 function areaStats(a){return poolStats(TESTABLE.filter(i=>i.a===a))}
 function topicStats(t){return poolStats(quizzable(t.ids))}
@@ -831,11 +837,11 @@ window.addEventListener("scroll",()=>$("#top").classList.toggle("scrolled",scrol
 function planTasks(){
   const dl=daysLeft(); const goal=S.settings.goal; const done=S.days[today()]||0;
   const exam=TESTABLE.filter(i=>i.x); const exSeen=exam.filter(seen).length;
-  const wrong=TESTABLE.filter(wrongLast).length; const nums=numsKnown(); const t=testsToday(); const days=Math.max(1,dl+1);
+  const wrong=TESTABLE.filter(wrongLast).length; const nums=numsKnown(); const t=testsToday(); const hz=dl!=null&&dl>0?dl:14; const days=hz+1;
   const exTarget=Math.min(exam.length, exSeen+Math.ceil((exam.length-exSeen)/days));
-  const numTarget=Math.min(NUMIDS.length, Math.ceil(NUMIDS.length/days)*Math.max(1,4-Math.max(0,dl)));
+  const numTarget=Math.min(NUMIDS.length, Math.ceil(NUMIDS.length/days)*Math.max(1,4-hz));
   const deckNums=()=>startDeck(NUMIDS,"Brojevi koje moraš znati");
-  if(dl<=0) return [
+  if(dl===0) return [
     {t:"Pređi „Brojeve koje moraš znati”",p:`${nums}/${NUMIDS.length}`,done:nums>=NUMIDS.length*.8,act:deckNums},
     {t:"Ponovi greške",p:wrong?`${wrong} ostalo`:"",done:wrong===0,act:()=>wrong?startQuiz({mode:"greske"}):toast("Nema grešaka")},
     {t:"Duboko udahni. Znaš ovo!",p:"",done:false,act:()=>toast("Srećno!")},
@@ -870,13 +876,17 @@ function viewHome(v){
   const ins=installCard(); if(ins) v.append(ins);
   const wrong=TESTABLE.filter(wrongLast).length; const st=streak(); const name=S.settings.name;
   v.append(h(`<div class="greet">${greeting()}${name?`, <b class="notr">${esc(S.settings.script==="cyr"?toCyr(name):name)}</b>`:""}.${dl===0?" Danas je ispit. Srećno!":dl===1?" Sutra je ispit, još malo.":""}</div>`));
-  const countTxt = dl>1?`${dl}<small>dana do ispita</small>`: dl===1?`Sutra<small>je ispit</small>`: dl===0?`Danas<small>je ispit</small>`:`Gotovo<small>ispit je prošao</small>`;
-  v.append(h(`<section class="hero">
-    <div class="eyebrow">Ispit · petak, 2. oktobar</div>
+  const has=dl!=null&&dl>=0, as=answerStats(), pct=as.n?Math.round(as.k/as.n*100):null;
+  const countTxt = !has?`${done}<small>/ ${goal} pitanja danas</small>`: dl>1?`${dl}<small>dana do ispita</small>`: dl===1?`Sutra<small>je ispit</small>`:`Danas<small>je ispit</small>`;
+  const hero=h(`<section class="hero">
+    <div class="row" style="justify-content:space-between;min-height:24px"><div class="eyebrow">${has?`Ispit · ${examLabel(examDay())}`:"Danas"}</div>${has?`<button class="link" id="exBtn" style="padding:0">Promeni</button>`:""}</div>
     <svg class="pulse" viewBox="0 0 160 56" aria-hidden="true"><path d="M0 34h40l6-12 7 24 9-38 8 40 6-14h26l5-7 5 7h48"/></svg><div class="countrow"><div class="count">${countTxt}</div></div>
-    <div class="row" style="justify-content:space-between;font-size:14px"><span><b>${done}</b> / ${goal} pitanja danas</span><span class="muted">${st>1?`${st} dana zaredom`:""}</span></div>
+    ${has?`<div class="row" style="justify-content:space-between;font-size:14px"><span><b>${done}</b> / ${goal} pitanja danas</span><span class="muted">${st>1?`${st} dana zaredom`:""}</span></div>`
+      :`<div class="row" style="justify-content:space-between;font-size:14px"><span>${st>1?`<b>${st}</b> dana zaredom`:done?"Učiš danas":"Danas još ništa"}</span><span class="muted">${pct!=null?`${pct}% tačno ukupno`:""}</span></div>`}
     <div class="bar" style="margin-top:8px"><i style="width:${Math.min(100,done/goal*100)}%"></i></div>
-  </section>`));
+    ${has?"":`<button class="btn sm" id="exBtn" style="margin-top:14px">${I.cal}${dl!=null?"Imaš novi ispit? Upiši datum":"Upiši datum svog ispita"}</button>`}
+  </section>`);
+  hero.querySelector("#exBtn").onclick=()=>examSheet(()=>go("home")); v.append(hero);
   if(S.quiz&&S.quiz.items&&S.quiz.items.length){
     const q=S.quiz; const answered=(q.answers||[]).filter(Boolean).length;
     const r=h(`<button class="resume">${I.play}<div class="grow"><b>Nastavi započeti test</b><div class="muted small">${esc(q.title)} · ${answered}/${q.items.length} odgovoreno</div></div>${I.chev}</button>`);
@@ -885,7 +895,7 @@ function viewHome(v){
   const cta=h(`<button class="big-cta">${I.bolt}<div class="grow"><b>Brzi test · 15 pitanja</b><span>Kao na ispitu: 9 nega, 3 zdr. zaštita, 3 Ustav</span></div>${I.chev}</button>`);
   cta.onclick=()=>startQuiz({mode:"brzi"}); v.append(cta);
   const tasks=planTasks(); const nd=tasks.filter(t=>t.done).length;
-  const plan=h(`<section class="card stack"><div class="row"><div class="eyebrow grow">${dl<=0?"Plan za ispitni dan":"Plan za danas"}</div><span class="pct ${nd===tasks.length?"good":""} notr">${nd}/${tasks.length}</span></div><ul class="plan"></ul></section>`);
+  const plan=h(`<section class="card stack"><div class="row"><div class="eyebrow grow">${dl===0?"Plan za ispitni dan":"Plan za danas"}</div><span class="pct ${nd===tasks.length?"good":""} notr">${nd}/${tasks.length}</span></div><ul class="plan"></ul></section>`);
   const ul=plan.querySelector("ul");
   tasks.forEach(t=>{const li=h(`<li><button class="task ${t.done?"done":""}"><span class="box">${I.check}</span><span class="t grow">${esc(t.t)}</span>${t.p?`<span class="p notr">${esc(t.p)}</span>`:""}${I.chev}</button></li>`);li.querySelector("button").onclick=t.act;ul.append(li)});
   v.append(plan);
@@ -1402,8 +1412,22 @@ function reportSheet(it){
     toast(sent?"Hvala! Prijava je poslata.":"Hvala! Prijava je sačuvana.")};
   applyScript(s); document.body.appendChild(s);
 }
+function examSheet(back){
+  const st=S.settings, min=today(), close=()=>{s.remove(); if(back)back()};
+  const s=sheet(`<h2 style="font-size:20px">Kad je tvoj ispit?</h2>
+    <input class="field" type="date" id="exD" min="${min}" value="${esc(st.exam&&st.exam>=min?st.exam:"")}">
+    <div class="muted small">Na početnom ekranu dobijaš odbrojavanje, a na dan ispita kratak plan za ponavljanje.${st.name?` Datum važi samo za ime „<span class="notr">${esc(st.name)}</span>”.`:""}</div>
+    ${st.exam?`<button class="btn block" id="exDel">${I.trash}Ukloni datum</button>`:""}
+    <div class="grid2"><button class="btn" id="no">Otkaži</button><button class="btn primary" id="yes">Sačuvaj</button></div>`,"Datum ispita");
+  const inp=s.querySelector("#exD");
+  s.querySelector("#no").onclick=close;
+  s.querySelector("#yes").onclick=()=>{ const v=inp.value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){toast("Izaberi datum");return} if(v<min){toast("Izaberi današnji ili neki kasniji dan");return}
+    st.exam=v; st.t=Date.now(); save(); close(); toast(`Ispit: ${examLabel(examDay())}`) };
+  const del=s.querySelector("#exDel"); if(del) del.onclick=()=>{ st.exam=""; st.t=Date.now(); save(); close(); toast("Datum ispita je uklonjen") };
+  applyScript(s); document.body.appendChild(s);
+}
 function settings(){
-  const st=S.settings;
+  const st=S.settings, ex=examDay();
   const s=sheet(`<h2 style="font-size:20px">Podešavanja</h2>
     <div class="stack" style="gap:6px"><div class="eyebrow">Profil</div><div class="flat row" style="gap:12px;padding:10px 12px">${avatarHTML(st.name,1)}<div class="grow"><b class="notr">${esc(st.name||"Bez imena")}</b><div class="muted small">Sav napredak se čuva pod ovim imenom.</div></div><button class="btn sm" id="sWho">Promeni</button></div></div>
     <div class="stack" style="gap:6px"><div class="eyebrow">Obraćanje</div><div class="seg" id="sG"><button data-v="f">Ženski rod</button><button data-v="m">Muški rod</button><button data-v="n">Oba (/la)</button></div><div class="muted small">Prepoznaje se iz imena, a ovde može da se promeni.</div></div>
@@ -1411,6 +1435,7 @@ function settings(){
     <div class="stack" style="gap:6px"><div class="eyebrow">Tema</div><div class="seg" id="sTheme"><button data-v="system">Kao telefon</button><button data-v="light">Svetla</button><button data-v="dark">Tamna</button></div></div>
     <div class="stack" style="gap:6px"><div class="eyebrow">Veličina teksta</div><div class="seg" id="sFs"><button data-v="1">A</button><button data-v="1.1" style="font-size:16px">A</button><button data-v="1.2" style="font-size:18px">A</button></div></div>
     <div class="stack" style="gap:6px"><div class="eyebrow">Dnevni cilj (pitanja)</div><div class="seg" id="sGoal"><button data-v="50">50</button><button data-v="100">100</button><button data-v="150">150</button><button data-v="200">200</button></div></div>
+    <div class="stack" style="gap:6px"><div class="eyebrow">Datum ispita</div><div class="flat row" style="gap:12px;padding:10px 12px"><span class="ic">${I.cal}</span><span class="grow small">${ex?examLabel(ex)+(daysLeft()<0?" (prošao)":""):"Nije upisan"}</span><button class="btn sm" id="sExam">${ex?"Promeni":"Upiši"}</button></div></div>
     <div class="flat row" style="gap:12px"><span class="ic">${I.cloud}</span><span class="small">${syncText()}</span></div>
     ${STANDALONE?"":`<details class="acc"><summary>Instaliraj aplikaciju na iPhone<span class="chev">${I.chev}</span></summary><div class="body"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">${PWA?"":APP_URL?`<li>Otvori u <b>Safariju</b>: <span class="notr" style="word-break:break-all">${esc(APP_URL)}</span></li>`:""}<li>Dodirni ikonicu za deljenje (kvadrat sa strelicom).</li><li>Izaberi <b>„Dodaj na početni ekran”</b> (Add to Home Screen).</li><li>Otvaraj je sa početnog ekrana: preko celog ekrana, sa svojom ikonicom, i bez interneta.</li></ol></div></details>`}
     <details class="acc"><summary>Rezervna kopija napretka<span class="chev">${I.chev}</span></summary><div class="body"><div class="muted small">Sačuvaj napredak svih imena u fajl (npr. u Files) ili kao tekst. Tako ga vraćaš ili prenosiš u aplikaciju na telefonu.</div><div class="grid2"><button class="btn sm" id="bkSave">${I.download}Sačuvaj u fajl</button><button class="btn sm" id="bkText">${I.cards}Kopiraj kao tekst</button></div><button class="btn sm block" id="bkLoad">${I.upload}Vrati sačuvan napredak</button></div></details>
@@ -1430,6 +1455,7 @@ function settings(){
   s.querySelectorAll("#sG button").forEach(b=>b.onclick=()=>{st.g=b.dataset.v==="n"?"":b.dataset.v;touch();mark("sG",gender()||"n");toast(st.g==="f"?"Obraćanje u ženskom rodu":st.g==="m"?"Obraćanje u muškom rodu":"Obraćanje sa /la")}); mark("sTheme",st.theme); mark("sGoal",st.goal); mark("sFs",st.fs);
   const touch=()=>{st.t=Date.now();save()};
   s.querySelector("#sWho").onclick=()=>{s.remove();whoSheet()};
+  s.querySelector("#sExam").onclick=()=>{s.remove();examSheet(()=>{if(!["quiz","deck"].includes(current))go(current,{keep:true});settings()})};
   s.querySelectorAll("#sScript button").forEach(b=>b.onclick=()=>{st.script=b.dataset.v;touch();s.remove();refreshAll();settings()});
   s.querySelectorAll("#sTheme button").forEach(b=>b.onclick=()=>{st.theme=b.dataset.v;touch();applyTheme();mark("sTheme",st.theme)});
   s.querySelectorAll("#sFs button").forEach(b=>b.onclick=()=>{st.fs=+b.dataset.v;touch();applyTheme();mark("sFs",st.fs)});
@@ -1456,7 +1482,8 @@ function onboarding(){
       ${PROF.active?`<div class="flat row" style="gap:12px;padding:10px 12px">${avatarHTML(st.name,1)}<div class="grow"><div class="eyebrow">Profil</div><b class="notr">${esc(st.name)}</b></div></div>`
         :`<div class="stack" style="gap:6px"><div class="eyebrow">Kako se zoveš?</div><input class="field" id="obName" maxlength="30" placeholder="Tvoje ime" autocomplete="off" autocapitalize="words" enterkeyhint="next"><div class="muted small">Napredak se čuva posebno za svako ime.</div><button class="link" id="obRestore" style="align-self:flex-start">${I.upload}Već si ${G("učila","učio","učio/la")}? Vrati sačuvan napredak</button></div>`}</div>`;
     if(step===1) body=`<div class="stack" style="gap:14px"><h2 style="font-size:22px">Podesi učenje</h2>
-      <div class="stack" style="gap:6px"><div class="eyebrow">Koliko pitanja dnevno?</div><div class="seg" id="obGoal"><button data-v="50">50</button><button data-v="100">100</button><button data-v="150">150</button><button data-v="200">200</button></div><div class="muted small">Do petka je preporuka 100–150 dnevno.</div></div>
+      <div class="stack" style="gap:6px"><div class="eyebrow">Kad je tvoj ispit?</div><input class="field" type="date" id="obExam" min="${today()}" value="${esc(st.exam||"")}"><div class="muted small">Nije obavezno. Ako još ne znaš, upisaćeš ga kasnije na početnom ekranu.</div></div>
+      <div class="stack" style="gap:6px"><div class="eyebrow">Koliko pitanja dnevno?</div><div class="seg" id="obGoal"><button data-v="50">50</button><button data-v="100">100</button><button data-v="150">150</button><button data-v="200">200</button></div><div class="muted small">Preporuka je 100–150 pitanja dnevno.</div></div>
       <div class="stack" style="gap:6px"><div class="eyebrow">Pismo</div><div class="seg" id="obScript"><button data-v="lat">Latinica</button><button data-v="cyr">Ćirilica</button></div></div>
       <div class="stack" style="gap:6px"><div class="eyebrow">Tema</div><div class="seg" id="obTheme"><button data-v="system">Kao telefon</button><button data-v="light">Svetla</button><button data-v="dark">Tamna</button></div></div></div>`;
     if(step===2) body=`<div class="stack" style="gap:12px"><h2 style="font-size:22px">Kako da učiš</h2>
@@ -1470,6 +1497,7 @@ function onboarding(){
     const mark=(id,val)=>box.querySelectorAll(`#${id} button`).forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===String(val))));
     if(step===1){mark("obGoal",st.goal);mark("obScript",st.script);mark("obTheme",st.theme);
       box.querySelectorAll("#obGoal button").forEach(b=>b.onclick=()=>{st.goal=+b.dataset.v;mark("obGoal",st.goal)});
+      const ox=box.querySelector("#obExam"); ox.addEventListener("change",()=>{const v=ox.value; st.exam=/^\d{4}-\d{2}-\d{2}$/.test(v)&&v>=today()?v:""});
       box.querySelectorAll("#obScript button").forEach(b=>b.onclick=()=>{st.script=b.dataset.v;refreshAll();draw()});
       box.querySelectorAll("#obTheme button").forEach(b=>b.onclick=()=>{st.theme=b.dataset.v;applyTheme();mark("obTheme",st.theme)})}
     const nm=box.querySelector("#obName"); if(nm) nm.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();box.querySelector("#obNext").click()}});
