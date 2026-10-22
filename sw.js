@@ -1,6 +1,6 @@
 /* Radi bez interneta: cela aplikacija (jedan HTML sa svim pitanjima), fontovi i ikonice se čuvaju na telefonu.
    Nova verzija se preuzme u pozadini, a aplikacija ponudi „Osveži”. */
-const CACHE = "drzavni-ispit-fa4995e1d3";
+const CACHE = "drzavni-ispit-fc6dd271b9";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./fonts/fonts.css", "./fonts/JetBrainsMono-cyrillic-b1b041.woff2", "./fonts/JetBrainsMono-cyrillic-ext-27e1b5.woff2", "./fonts/JetBrainsMono-latin-480c06.woff2", "./fonts/JetBrainsMono-latin-ext-ba1653.woff2", "./fonts/Onest-cyrillic-4c7562.woff2", "./fonts/Onest-cyrillic-ext-992f92.woff2", "./fonts/Onest-latin-cebbb5.woff2", "./fonts/Onest-latin-ext-27cee5.woff2", "./fonts/Unbounded-cyrillic-c86556.woff2", "./fonts/Unbounded-cyrillic-ext-67e1db.woff2", "./fonts/Unbounded-latin-06f2e4.woff2", "./fonts/Unbounded-latin-ext-80da0c.woff2", "./icons/apple-touch-icon.png", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE))); });
 self.addEventListener("activate", e => {
@@ -11,6 +11,7 @@ self.addEventListener("fetch", e => {
   const r = e.request;
   if (r.method !== "GET" || new URL(r.url).origin !== location.origin) return;
   if (r.mode === "navigate") {
+    if (!/\/(index\.html)?$/.test(new URL(r.url).pathname)) return; // druge stranice (npr. brojac.html) idu na mrežu
     e.respondWith(caches.match("./index.html").then(c => c || fetch(r)));
     return;
   }

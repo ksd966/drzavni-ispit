@@ -419,7 +419,7 @@ const DATA = {"docs":["ZDR nega (bitno)","Nova pitanja NEGA (1. dec)","Najčeš�
 (function(){
 "use strict";
 /* ============ constants ============ */
-const VERSION = "3.7";
+const VERSION = "3.8";
 const PWA = true;   // true u verziji koja se instalira na telefon (docs/)
 const STANDALONE = !!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -642,7 +642,7 @@ function openProfile(name){
   let next=readLocal(slug)||freshState(nm);
   if(carry)next=mergeState(next,carry);
   next.settings.name=nm; S=next;
-  PROF.list[slug]=Object.assign(PROF.list[slug]||{name:nm,c:Date.now()},{u:Date.now()}); PROF.active=slug; saveProfiles();
+  PROF.list[slug]=Object.assign(PROF.list[slug]||{name:nm,c:Date.now()},{u:Date.now()}); PROF.active=slug; saveProfiles(); setTimeout(()=>countUse(false),1500);
   S.lastOpen=Date.now(); writeLocal();
   REF=null; pushed=0; if(syncState==="ok")setSync("local");
   applyTheme(); updateAvatar(); refreshAll();
@@ -1421,6 +1421,7 @@ function settings(){
       <div class="muted small">Sva ostala pitanja i odgovori su iz poslatog materijala, a ispod svakog piše dokument i strana.</div>
       <div class="muted small">Kod pitanja koja u materijalu nisu imala ponuđene odgovore, netačni ponuđeni odgovori su odgovori na druga pitanja iz materijala (ili drugi broj iz materijala). Ništa nije izmišljeno.</div></div></details>
     <div class="flat"><div class="kv"><span>Pitanja u bazi</span><b class="notr">${ITEMS.length}</b></div><div class="kv"><span>Pitanja sa ponuđenim odgovorima</span><b class="notr">${TESTABLE.length}</b></div><div class="kv"><span>Dokumenata</span><b class="notr">${DOCS.length}</b></div><div class="kv"><span>Prijavljenih pitanja</span><b class="notr">${Object.keys(S.rep).length}</b></div><div class="kv"><span>Verzija</span><b class="notr">${VERSION}</b></div></div>
+    ${cntOn()?`<div class="muted small">Aplikacija anonimno broji koliko ljudi je koristi (bez imena, odgovora i rezultata – oni ostaju samo na ovom telefonu).</div>`:""}
     <button class="btn block" id="sIntro">Prikaži uvodni vodič</button>
     <button class="btn bad block" id="sReset">Obriši napredak za ovo ime</button>
     <button class="btn primary block" id="sClose">Gotovo</button>`,"Podešavanja");
@@ -1563,6 +1564,7 @@ function restoreSheet(){
 /* ============ instalirana aplikacija: rad bez interneta i nove verzije ============ */
 function initPWA(){
   if(!PWA)return;
+  setTimeout(()=>countUse(true),2500); window.addEventListener("online",()=>countUse(false));
   try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{}) }catch(e){}
   if(!("serviceWorker" in navigator)||(location.protocol!=="https:"&&location.hostname!=="localhost"))return;
   const ready=w=>{ if(document.querySelector(".upd"))return; const b=h(`<button class="upd">Nova verzija aplikacije je spremna · <b>Osveži</b></button>`); b.onclick=()=>{flush(); w.postMessage("skip"); b.remove()}; applyScript(b); document.body.appendChild(b) };
@@ -1572,6 +1574,35 @@ function initPWA(){
     document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") reg.update().catch(()=>{}) });
   }).catch(()=>{});
   let reloading=false; navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(reloading||!navigator.serviceWorker.controller)return; reloading=true; flush(); location.reload() });
+}
+/* ============ anonimni brojač korisnika ============
+   Samo prava aplikacija (APP_URL). Šalje se samo brojanje, nikad ime, odgovori ni rezultati:
+   uredjaji – jednom po telefonu · start-GGGGMMDD – dan kad je na tom telefonu počelo učenje (i za one koji su počeli
+   pre brojača, pa se vidi istorija od objavljivanja) · pre-brojaca · imena – svako novo ime na telefonu ·
+   aktivni-GGGGMMDD – jednom dnevno po telefonu · otvaranja. Brojke: brojac.html */
+const CNT_BASE="https://abacus.jasoncameron.dev/hit/drzavni-ispit-ksd966/", CNT_KEY="skr_cnt_v1", CNT_START="20261022";
+let cntBusy=false;
+function ymd(t){const d=new Date(t);return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")}
+async function cntHit(k){try{const r=await fetch(CNT_BASE+k,{cache:"no-store",credentials:"omit",referrerPolicy:"no-referrer"});return r.ok}catch(e){return false}}
+function firstUse(){ // najraniji trag na ovom telefonu: kad je upisano ime ili dan prvog odgovora
+  let t=Date.now(); Object.values(PROF.list).forEach(p=>{if(p&&p.c)t=Math.min(t,p.c)});
+  Object.keys(PROF.list).forEach(slug=>{const o=slug===PROF.active?S:readLocal(slug); Object.keys((o&&o.days)||{}).forEach(d=>{const x=Date.parse(d+"T12:00:00"); if(x)t=Math.min(t,x)})});
+  return t }
+function cntOn(){ return PWA&&!!APP_URL&&(location.origin+location.pathname).startsWith(APP_URL) }
+async function countUse(opened){
+  if(!cntOn()||cntBusy||navigator.onLine===false)return;
+  cntBusy=true;
+  try{
+    let c={}; try{c=JSON.parse(lsGet(CNT_KEY)||"{}")||{}}catch(e){}
+    const put=()=>lsSet(CNT_KEY,JSON.stringify(c));
+    if(!c.u&&await cntHit("uredjaji")){c.u=1;put()}
+    if(c.u&&!c.dev){const f=ymd(firstUse()); if(await cntHit("start-"+f)){c.dev=f;put()}}
+    if(c.dev&&c.dev<CNT_START&&!c.p&&await cntHit("pre-brojaca")){c.p=1;put()}
+    const td=ymd(Date.now()); if(c.day!==td&&await cntHit("aktivni-"+td)){c.day=td;put()}
+    c.names=Array.isArray(c.names)?c.names:[];
+    for(const sl of Object.keys(PROF.list)) if(!c.names.includes(sl)&&await cntHit("imena")){c.names.push(sl);put()}
+    if(opened)await cntHit("otvaranja");
+  }catch(e){} finally{cntBusy=false}
 }
 function refreshAll(){ $("#title").textContent="Državni ispit"; $("#subtitle").textContent="Priprema"; $("#btnStats").setAttribute("aria-label","Statistika"); $("#btnSettings").setAttribute("aria-label","Podešavanja"); applyScript($("#top")); updateTabs(); if(!["quiz","deck"].includes(current))go(current,{keep:true}) }
 

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="sr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Brojač korisnika</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+/* Stranica sa anonimnim brojkama aplikacije „Državni ispit”. Podaci: abacus.jasoncameron.dev, prostor drzavni-ispit-ksd966. */
+:root{--bg:#EEF3F2;--surface:#FFFFFF;--surface-2:#F6F9F8;--ink:#12201E;--muted:#5A6B68;--line:#D6E0DE;--grid:#E6ECEA;--bar:#2a78d6;--bar-hi:#1c5cab;--mark:#5A6B68;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0C1413;--surface:#141F1D;--surface-2:#1A2725;--ink:#E4EEEB;--muted:#98ABA7;--line:#26352F;--grid:#1F2B28;--bar:#3987e5;--bar-hi:#86b6ef;--mark:#98ABA7;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Onest,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:720px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:14px}
+h1{font:700 24px/1.2 Unbounded,Onest,system-ui,sans-serif;margin:0}
+.sub{color:var(--muted);margin:4px 0 0;font-size:15px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.tile b{display:block;font-size:30px;font-weight:700;line-height:1.15}
+.tile span{color:var(--muted);font-size:13px}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.read{min-height:22px;font-size:14px;color:var(--muted);margin:2px 0 6px}
+.read b{color:var(--ink)}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{font:11px Onest,system-ui,sans-serif;fill:var(--muted)}
+svg .v{fill:var(--ink);font-weight:600}
+svg .b{fill:var(--bar)} svg .b.on{fill:var(--bar-hi)}
+svg .hit{fill:transparent;cursor:pointer;outline:none}
+svg .hit:focus-visible{stroke:var(--ink);stroke-width:1.5}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--muted);font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
+td,th{padding:5px 0;border-top:1px solid var(--line);text-align:left}
+td:last-child,th:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.note{color:var(--muted);font-size:14px}
+.note li{margin:4px 0}
+button{font:600 15px Onest,system-ui,sans-serif;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:10px 14px;min-height:44px}
+.prog{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <div><h1>Brojač korisnika</h1><p class="sub">Aplikacija „Državni ispit” · anonimno, bez imena, odgovora i rezultata</p></div>
+  <div class="tiles">
+    <div class="tile"><b id="t-dev">–</b><span>telefona (korisnika)</span></div>
+    <div class="tile"><b id="t-names">–</b><span>upisanih imena</span></div>
+    <div class="tile"><b id="t-pre">–</b><span>počeli pre brojača (vraćeni iz telefona)</span></div>
+    <div class="tile"><b id="t-open">–</b><span>otvaranja od uključenja brojača</span></div>
+  </div>
+  <section class="card">
+    <div class="eyebrow">Kad su ljudi počeli da uče</div>
+    <div class="read" id="r-start">Broj telefona po danu kad je na njima prvi put upisano ime. Dodirni stubić.</div>
+    <div id="c-start"></div>
+    <details><summary>Tabela</summary><table id="tb-start"></table></details>
+  </section>
+  <section class="card">
+    <div class="eyebrow">Aktivni telefoni po danu</div>
+    <div class="read" id="r-act">Koliko telefona je otvorilo aplikaciju tog dana. Dodirni stubić.</div>
+    <div id="c-act"></div>
+    <details><summary>Tabela</summary><table id="tb-act"></table></details>
+  </section>
+  <div class="row"><button id="again">Osveži brojke</button> <span class="prog" id="prog"></span></div>
+  <ul class="note">
+    <li>Brojač je uključen 22. 10. 2026. Pre toga aplikacija nije slala ništa, pa za ranije dane nema podataka o otvaranjima.</li>
+    <li>Istorija od objavljivanja se vraća iz samih telefona: svaki telefon pamti dan kad je ime upisano. Kad korisnik ponovo otvori aplikaciju (sa internetom), javlja samo taj dan. Ko više ne otvara aplikaciju, ne može da se izbroji.</li>
+    <li>Isti čovek se broji dva puta ako koristi i Safari i aplikaciju sa početnog ekrana, jer iPhone za njih čuva podatke odvojeno.</li>
+  </ul>
+</main>
+<script>
+const NS="drzavni-ispit-ksd966", API="https://abacus.jasoncameron.dev/get/"+NS+"/";
+const FIRST=new Date(2026,8,29), CNT_START=new Date(2026,9,22);
+const ymd=d=>d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
+const lbl=d=>d.getDate()+". "+(d.getMonth()+1)+".";
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let cache={}; try{cache=JSON.parse(localStorage.getItem("brojac_cache")||"{}")}catch(e){}
+function days(from){const out=[],d=new Date(from),t=new Date();t.setHours(0,0,0,0);while(d<=t){out.push(new Date(d));d.setDate(d.getDate()+1)}return out}
+async function get(key,done,total){
+  if(key in cache)return cache[key];
+  for(let i=0;i<4;i++){
+    try{const r=await fetch(API+key,{cache:"no-store"});
+      if(r.status===404)return 0;
+      if(r.status===429){await sleep(+(r.headers.get("Retry-After")||5000));continue}
+      if(r.ok){const j=await r.json();return +j.value||0}
+    }catch(e){}
+    await sleep(1500);
+  }
+  return null;
+}
+function chart(el,rd,rows,unit,markDay){
+  const W=640,H=200,top=22,bot=28,PL=28,n=rows.length,slot=(W-PL)/n,bw=Math.min(24,Math.max(4,slot*0.62));
+  const max=Math.max(1,...rows.map(r=>r.v||0)); const y=v=>top+(H-top-bot)*(1-v/max);
+  const ticks=[0,Math.ceil(max/2),max].filter((v,i,a)=>a.indexOf(v)===i);
+  let g=ticks.map(v=>`<line x1="${PL}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${PL-8}" y="${y(v)+4}" text-anchor="end">${v}</text>`).join("");
+  const maxI=rows.reduce((m,r,i)=>(r.v||0)>(rows[m].v||0)?i:m,0);
+  rows.forEach((r,i)=>{const x=PL+i*slot+(slot-bw)/2, v=r.v||0, h=Math.max(0,y(0)-y(v)), rr=Math.min(4,bw/2,h);
+    if(v>0) g+=`<path class="b" data-i="${i}" d="M${x} ${y(0)}V${y(v)+rr}Q${x} ${y(v)} ${x+rr} ${y(v)}H${x+bw-rr}Q${x+bw} ${y(v)} ${x+bw} ${y(v)+rr}V${y(0)}Z"/>`;
+    if(i===maxI&&v>0) g+=`<text class="v" x="${x+bw/2}" y="${y(v)-6}" text-anchor="middle">${v}</text>`;
+    const every=Math.ceil(n/6); if(i%every===0||i===n-1) g+=`<text x="${PL+i*slot+slot/2}" y="${H-8}" text-anchor="middle">${lbl(r.d)}</text>`;
+    g+=`<rect class="hit" data-i="${i}" x="${PL+i*slot}" y="0" width="${slot}" height="${H-bot}" tabindex="0" aria-label="${lbl(r.d)}: ${r.v==null?"nepoznato":v+" "+unit}"/>`;
+  });
+  if(markDay!=null&&markDay>=0){const x=PL+markDay*slot+slot/2, left=x>W*0.6; g+=`<line x1="${x}" x2="${x}" y1="${top-8}" y2="${y(0)}" stroke="var(--mark)" stroke-dasharray="3 3"/><text x="${left?x-6:x+6}" y="${top-10}" text-anchor="${left?"end":"start"}">uključen brojač</text>`}
+  g+=`<line x1="${PL}" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)"/>`;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Grafikon po danima">${g}</svg>`;
+  const base=rd.textContent;
+  const show=i=>{el.querySelectorAll(".b").forEach(b=>b.classList.toggle("on",b.dataset.i==String(i)));
+    if(i==null){rd.textContent=base;return} const r=rows[i]; rd.textContent=""; const b=document.createElement("b"); b.textContent=r.v==null?"?":String(r.v); rd.append(b,document.createTextNode(" "+unit+" · "+lbl(r.d)+" "+r.d.getFullYear()+"."))};
+  el.querySelectorAll(".hit").forEach(h=>{const i=+h.dataset.i; h.addEventListener("pointerenter",()=>show(i)); h.addEventListener("click",()=>show(i)); h.addEventListener("focus",()=>show(i))});
+  el.querySelector("svg").addEventListener("pointerleave",()=>show(null));
+}
+function table(el,rows,unit){el.innerHTML="";const tr=document.createElement("tr");["Dan",unit].forEach(t=>{const th=document.createElement("th");th.textContent=t;tr.append(th)});el.append(tr);
+  rows.slice().reverse().forEach(r=>{const tr=document.createElement("tr");[lbl(r.d)+" "+r.d.getFullYear()+".",r.v==null?"?":String(r.v)].forEach(t=>{const td=document.createElement("td");td.textContent=t;tr.append(td)});el.append(tr)})}
+async function load(){
+  const prog=document.getElementById("prog"); const btn=document.getElementById("again"); btn.disabled=true;
+  const sd=days(FIRST), ad=days(CNT_START), today=ymd(new Date());
+  const keys=["uredjaji","imena","pre-brojaca","otvaranja"].concat(sd.map(d=>"start-"+ymd(d)),ad.map(d=>"aktivni-"+ymd(d)));
+  const val={}; let k=0;
+  for(const key of keys){ prog.textContent=`Učitavam ${++k}/${keys.length}…`;
+    const fromCache=key in cache; val[key]=await get(key);
+    if(!fromCache&&val[key]!=null&&key.startsWith("aktivni-")&&key.slice(8)<today)cache[key]=val[key]; // prošli dani se više ne menjaju
+    if(!fromCache)await sleep(380); }
+  try{localStorage.setItem("brojac_cache",JSON.stringify(cache))}catch(e){}
+  const fmt=v=>v==null?"?":String(v);
+  document.getElementById("t-dev").textContent=fmt(val["uredjaji"]);
+  document.getElementById("t-names").textContent=fmt(val["imena"]);
+  document.getElementById("t-pre").textContent=fmt(val["pre-brojaca"]);
+  document.getElementById("t-open").textContent=fmt(val["otvaranja"]);
+  const sr=sd.map(d=>({d,v:val["start-"+ymd(d)]})), ar=ad.map(d=>({d,v:val["aktivni-"+ymd(d)]}));
+  chart(document.getElementById("c-start"),document.getElementById("r-start"),sr,"telefona počelo",sd.findIndex(d=>ymd(d)===ymd(CNT_START)));
+  chart(document.getElementById("c-act"),document.getElementById("r-act"),ar,"aktivnih telefona",null);
+  table(document.getElementById("tb-start"),sr,"Počelo"); table(document.getElementById("tb-act"),ar,"Aktivno");
+  prog.textContent="Ažurirano "+new Date().toLocaleTimeString("sr-RS",{hour:"2-digit",minute:"2-digit"}); btn.disabled=false;
+}
+document.getElementById("again").onclick=load;
+load();
+</script>
+</body>
+</html>
