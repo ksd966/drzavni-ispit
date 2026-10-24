@@ -423,7 +423,7 @@ const DATA = {"docs":["ZDR nega (bitno)","Nova pitanja NEGA (1. dec)","Najčeš�
 (function(){
 "use strict";
 /* ============ constants ============ */
-const VERSION = "4.2";
+const VERSION = "4.3";
 const PWA = true;   // true u verziji koja se instalira na telefon (docs/)
 const STANDALONE = !!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -923,6 +923,7 @@ function viewHome(v){
     r.onclick=()=>startQuiz({mode:"oblast",area:a}); areas.append(r)});
   const sl=h(`<button class="link">${I.chart}Pogledaj celu statistiku</button>`); sl.onclick=()=>go("stats"); areas.append(sl);
   v.append(areas);
+  if(newsOpen()&&!(dl!=null&&dl<0)) v.append(newsCard()); // na dnu početnog ekrana (posle ispita stoji odmah ispod odbrojavanja)
 }
 
 /* ============ STATS ============ */
