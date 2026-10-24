@@ -110,6 +110,8 @@ header.top.scrolled{border-bottom-color:var(--line)}
 .brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
 .brand svg{flex:none}
 .brand b{display:block;font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header.top.fit1{gap:6px} header.top.fit1 .brand{gap:8px} header.top.fit1 .brand b{letter-spacing:0}
+header.top.fit2 .brand>svg{display:none}
 .brand small{display:block;font-size:12px;color:var(--muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iconbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;flex:none;position:relative}
 .iconbtn svg{width:20px;height:20px}
@@ -421,7 +423,7 @@ const DATA = {"docs":["ZDR nega (bitno)","Nova pitanja NEGA (1. dec)","Najčeš�
 (function(){
 "use strict";
 /* ============ constants ============ */
-const VERSION = "4.1";
+const VERSION = "4.2";
 const PWA = true;   // true u verziji koja se instalira na telefon (docs/)
 const STANDALONE = !!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -1676,7 +1678,16 @@ async function countUse(opened){
     if(opened)await cntHit("otvaranja");
   }catch(e){} finally{cntBusy=false}
 }
-function refreshAll(){ $("#title").textContent="Državni ispit"; $("#subtitle").textContent="Priprema"; $("#btnStats").setAttribute("aria-label","Statistika"); $("#btnSettings").setAttribute("aria-label","Podešavanja"); applyScript($("#top")); updateTabs(); if(!["quiz","deck"].includes(current))go(current,{keep:true}) }
+/* naslov u zaglavlju uvek ceo: prvo manji razmaci, pa malo manji font, pa bez znaka (ćirilica je šira od latinice) */
+function fitTitle(){ const top=$("#top"), t=$("#title"); if(!top||!t)return;
+  top.classList.remove("fit1","fit2"); t.style.fontSize="";
+  const over=()=>t.scrollWidth>t.clientWidth+.5, shrink=min=>{let fs=15; while(over()&&fs>min){fs-=.5;t.style.fontSize=fs+"px"}};
+  if(!over())return; top.classList.add("fit1"); if(!over())return;
+  shrink(13.5); if(!over())return;
+  t.style.fontSize=""; top.classList.add("fit2"); if(over())shrink(12) }
+let fitRaf=0; window.addEventListener("resize",()=>{cancelAnimationFrame(fitRaf);fitRaf=requestAnimationFrame(fitTitle)});
+try{ document.fonts&&document.fonts.ready.then(fitTitle) }catch(e){}
+function refreshAll(){ $("#title").textContent="Državni ispit"; $("#subtitle").textContent="Priprema"; $("#btnStats").setAttribute("aria-label","Statistika"); $("#btnSettings").setAttribute("aria-label","Podešavanja"); applyScript($("#top")); fitTitle(); updateTabs(); if(!["quiz","deck"].includes(current))go(current,{keep:true}) }
 
 /* ============ confetti ============ */
 function confetti(){
