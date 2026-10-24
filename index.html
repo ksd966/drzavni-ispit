@@ -421,7 +421,7 @@ const DATA = {"docs":["ZDR nega (bitno)","Nova pitanja NEGA (1. dec)","Najčeš�
 (function(){
 "use strict";
 /* ============ constants ============ */
-const VERSION = "4.0";
+const VERSION = "4.1";
 const PWA = true;   // true u verziji koja se instalira na telefon (docs/)
 const STANDALONE = !!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -476,6 +476,7 @@ const I = {
   share:P+'<path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   download:P+'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>',
   upload:P+'<path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></svg>',
+  mail:P+'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 7l9 6 9-6"/></svg>',
   cal:P+'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   users:P+'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg>',
 };
@@ -717,7 +718,7 @@ function applyScript(root){
   const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement&&n.parentElement.closest(".notr,script,style,textarea")?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
   const nodes=[];while(w.nextNode())nodes.push(w.currentNode);
   nodes.forEach(n=>{n.nodeValue=toCyr(n.nodeValue)});
-  root.querySelectorAll("[placeholder],[aria-label]").forEach(el=>{["placeholder","aria-label"].forEach(a=>{if(el.hasAttribute(a))el.setAttribute(a,toCyr(el.getAttribute(a)))})});
+  root.querySelectorAll("[placeholder],[aria-label]").forEach(el=>{ if(el.closest(".notr"))return;["placeholder","aria-label"].forEach(a=>{if(el.hasAttribute(a))el.setAttribute(a,toCyr(el.getAttribute(a)))})});
 }
 
 /* ============ helpers ============ */
@@ -887,6 +888,7 @@ function viewHome(v){
     ${has?"":`<button class="btn sm" id="exBtn" style="margin-top:14px">${I.cal}${dl!=null?"Imaš novi ispit? Upiši datum":"Upiši datum svog ispita"}</button>`}
   </section>`);
   hero.querySelector("#exBtn").onclick=()=>examSheet(()=>go("home")); v.append(hero);
+  if(dl!=null&&dl<0&&newsOpen()) v.append(newsCard());
   if(S.quiz&&S.quiz.items&&S.quiz.items.length){
     const q=S.quiz; const answered=(q.answers||[]).filter(Boolean).length;
     const r=h(`<button class="resume">${I.play}<div class="grow"><b>Nastavi započeti test</b><div class="muted small">${esc(q.title)} · ${answered}/${q.items.length} odgovoreno</div></div>${I.chev}</button>`);
@@ -1210,6 +1212,7 @@ function viewResults(v){
   const b2=h(`<button class="btn">${q.ctid?I.redo+"Ponovi ovaj test":I.bolt+"Novi test"}</button>`); b2.onclick=()=>{ if(q.ctid)startQuiz({mode:"ct",ct:q.ctid}); else if(q.mode==="custom")builder(); else startQuiz({mode:q.mode==="ids"?"brzi":q.mode,area:q.area}) };
   if(q.ctid&&S.ct[q.ctid]){const r=S.ct[q.ctid]; v.append(h(`<div class="flat row" style="gap:12px"><span class="ic">${I.trophy}</span><div class="small">Ovaj test si ${G("uradila","uradio","uradio/la")} <b class="notr">${r.n}×</b> · najbolji rezultat <b class="notr">${r.best}/${r.tot}</b>. Rezultat se vidi i na kartici testa.</div></div>`))}
   row.append(b1,b2); v.append(row);
+  if(newsOpen()&&(lastResult.news||(!newsState().r&&S.hist.length>=3&&pct>=60))){ if(!lastResult.news){lastResult.news=1;newsSet({r:Date.now()})} v.append(newsCard()) }
   const byArea={}; q.items.forEach((it,i)=>{const a=byArea[it.a]||(byArea[it.a]={n:0,k:0});a.n++;if(q.answers[i]&&q.answers[i].ok)a.k++});
   v.append(h(`<section class="flat">${Object.entries(byArea).map(([a,s])=>`<div class="kv"><span>${AREAS[a]}</span><b class="notr">${s.k} / ${s.n}</b></div>`).join("")}</section>`));
   v.append(h(`<div class="eyebrow">Pregled pitanja</div>`));
@@ -1221,6 +1224,42 @@ function viewResults(v){
     li.querySelector(".rp").onclick=()=>reportSheet(it);
     list.append(li)});
   v.append(list);
+}
+
+/* ============ novosti: mejl lista (Brevo, double opt-in) ============
+   Samo u aplikaciji za telefon. Mejl ide direktno u Brevo listu „Državni ispit – novosti”;
+   na telefonu se pamti samo da li je prijava poslata ili odbijena (skr_news_v1), ne i sam mejl. */
+const NEWS_URL="https://830e2d16.sibforms.com/serve/MUIFABfQiG-5Q7KLSZoVOc2EAnqw8fYC-GMLlh5CtTlHf2qXpq7czZUJ8yvUbZVPFEXqu3QAMTgavJKBJr1y8S1GudiKEaEOx8ob4Gfg0rbFVNPWfP81UUCT4YzyVWAndEj5Rzx5ITcWqL49O9vsvBm5CGtmE6ljSyiqUmnO9SuQemlJlbjaMGQEMat6h6de7R1Xirz7O6mxstAwmw==", NEWS_KEY="skr_news_v1";
+function newsState(){try{return JSON.parse(lsGet(NEWS_KEY)||"{}")||{}}catch(e){return {}}}
+function newsSet(p){lsSet(NEWS_KEY,JSON.stringify(Object.assign(newsState(),p)))}
+function newsOpen(){const n=newsState(); return PWA&&!n.s&&!n.no}
+function newsDone(txt){return h(`<div class="row" style="gap:12px;align-items:flex-start"><span class="ic" style="background:var(--good-soft);color:var(--good)">${I.check}</span><div class="grow"><b>Hvala!</b><div class="muted small" style="margin-top:2px">${txt}</div></div></div>`)}
+function newsCard(opt={}){
+  const c=h(`<section class="${opt.bare?"":"card "}stack" style="gap:12px">
+    <div class="row" style="gap:12px;align-items:flex-start"><span class="ic">${I.mail}</span><div class="grow"><b><span class="notr">Sidekick</span> razvija korisne aplikacije</b><div class="muted small" style="margin-top:2px">Ostavi mejl i javićemo ti za novosti, nove verzije i nove aplikacije.</div></div></div>
+    <form class="pnew" novalidate><input class="field notr" type="email" placeholder="tvoj@mejl.com" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" maxlength="120" aria-label="Mejl"><button class="btn primary" type="submit">Javi mi</button></form>
+    <div class="row small muted" style="gap:12px;flex-wrap:wrap"><span class="grow">Bez reklama. Odjava jednim klikom.</span><button class="link quiet" type="button" data-a="priv">Privatnost</button>${opt.bare?"":`<button class="link quiet" type="button" data-a="no">Ne, hvala</button>`}</div>
+  </section>`);
+  const f=c.querySelector("form"), inp=f.querySelector("input"), btn=f.querySelector("button");
+  f.onsubmit=async e=>{ e.preventDefault(); const m=inp.value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m)){toast("Upiši ispravan mejl.");inp.focus();return}
+    if(navigator.onLine===false){toast("Nema interneta. Pokušaj kad budeš na mreži.");return}
+    btn.disabled=true; btn.textContent="Šaljem…"; let ok=false;
+    try{ const fd=new FormData(); fd.append("EMAIL",m); fd.append("email_address_check",""); fd.append("locale","en");
+      const r=await fetch(NEWS_URL+"?isAjax=1",{method:"POST",body:fd,credentials:"omit",referrerPolicy:"no-referrer"}); const j=await r.json().catch(()=>({})); ok=r.ok&&j.success!==false }catch(e){}
+    if(!ok){btn.disabled=false; btn.textContent="Javi mi"; applyScript(btn); toast("Prijava nije uspela. Pokušaj ponovo."); return}
+    newsSet({s:Date.now()}); const d=newsDone("Još samo korak: otvori mejl i potvrdi prijavu."); c.replaceChildren(d); applyScript(c) };
+  c.querySelector('[data-a="priv"]').onclick=newsPrivacy;
+  const no=c.querySelector('[data-a="no"]'); if(no) no.onclick=()=>{ newsSet({no:Date.now()}); c.remove(); toast("U redu. Prijava je uvek u podešavanjima.") };
+  return c;
+}
+function newsPrivacy(){
+  const s=sheet(`<h2 style="font-size:20px">Privatnost</h2>
+    <p style="margin:0">Mejl čuva <span class="notr">Sidekick</span> u servisu <span class="notr">Brevo</span>, samo da bi ti slao vesti o novim verzijama i novim aplikacijama. Ne delimo ga ni sa kim i ne šaljemo reklame.</p>
+    <p style="margin:0">Prijava važi tek kad je potvrdiš u mejlu. Odjava je jednim klikom na dnu svakog mejla. Ako želiš da obrišemo tvoj mejl, odgovori na bilo koji naš mejl.</p>
+    <p class="muted" style="margin:0">Ime, odgovori i rezultati iz aplikacije ostaju samo na ovom telefonu i ne povezuju se sa mejlom.</p>
+    <button class="btn primary block" id="ok">Razumem</button>`,"Privatnost");
+  s.querySelector("#ok").onclick=()=>s.remove(); applyScript(s); document.body.appendChild(s);
 }
 
 /* ============ SURPRISE ============ */
@@ -1438,6 +1477,7 @@ function settings(){
     <div class="stack" style="gap:6px"><div class="eyebrow">Datum ispita</div><div class="flat row" style="gap:12px;padding:10px 12px"><span class="ic">${I.cal}</span><span class="grow small">${ex?examLabel(ex)+(daysLeft()<0?" (prošao)":""):"Nije upisan"}</span><button class="btn sm" id="sExam">${ex?"Promeni":"Upiši"}</button></div></div>
     <div class="flat row" style="gap:12px"><span class="ic">${I.cloud}</span><span class="small">${syncText()}</span></div>
     ${STANDALONE?"":`<details class="acc"><summary>Instaliraj aplikaciju na iPhone<span class="chev">${I.chev}</span></summary><div class="body"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">${PWA?"":APP_URL?`<li>Otvori u <b>Safariju</b>: <span class="notr" style="word-break:break-all">${esc(APP_URL)}</span></li>`:""}<li>Dodirni ikonicu za deljenje (kvadrat sa strelicom).</li><li>Izaberi <b>„Dodaj na početni ekran”</b> (Add to Home Screen).</li><li>Otvaraj je sa početnog ekrana: preko celog ekrana, sa svojom ikonicom, i bez interneta.</li></ol></div></details>`}
+    ${PWA?`<details class="acc"><summary>Novosti i nove aplikacije<span class="chev">${I.chev}</span></summary><div class="body" id="sNews"></div></details>`:""}
     <details class="acc"><summary>Rezervna kopija napretka<span class="chev">${I.chev}</span></summary><div class="body"><div class="muted small">Sačuvaj napredak svih imena u fajl (npr. u Files) ili kao tekst. Tako ga vraćaš ili prenosiš u aplikaciju na telefonu.</div><div class="grid2"><button class="btn sm" id="bkSave">${I.download}Sačuvaj u fajl</button><button class="btn sm" id="bkText">${I.cards}Kopiraj kao tekst</button></div><button class="btn sm block" id="bkLoad">${I.upload}Vrati sačuvan napredak</button></div></details>
     <details class="acc"><summary>Šta znače oznake<span class="chev">${I.chev}</span></summary><div class="body">
       <div class="row"><span class="badge exam">${I.flag}Sa pravog ispita</span><span class="muted small">Pitanje zapisano sa ispitnog roka.</span></div>
@@ -1455,6 +1495,7 @@ function settings(){
   s.querySelectorAll("#sG button").forEach(b=>b.onclick=()=>{st.g=b.dataset.v==="n"?"":b.dataset.v;touch();mark("sG",gender()||"n");toast(st.g==="f"?"Obraćanje u ženskom rodu":st.g==="m"?"Obraćanje u muškom rodu":"Obraćanje sa /la")}); mark("sTheme",st.theme); mark("sGoal",st.goal); mark("sFs",st.fs);
   const touch=()=>{st.t=Date.now();save()};
   s.querySelector("#sWho").onclick=()=>{s.remove();whoSheet()};
+  const sn=s.querySelector("#sNews"); if(sn) sn.append(newsState().s?newsDone(`Prijava je poslata. Ako je još nisi ${G("potvrdila","potvrdio","potvrdio/la")}, potraži naš mejl (i u neželjenoj pošti).`):newsCard({bare:true}));
   s.querySelector("#sExam").onclick=()=>{s.remove();examSheet(()=>{if(!["quiz","deck"].includes(current))go(current,{keep:true});settings()})};
   s.querySelectorAll("#sScript button").forEach(b=>b.onclick=()=>{st.script=b.dataset.v;touch();s.remove();refreshAll();settings()});
   s.querySelectorAll("#sTheme button").forEach(b=>b.onclick=()=>{st.theme=b.dataset.v;touch();applyTheme();mark("sTheme",st.theme)});
