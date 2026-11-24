@@ -423,7 +423,7 @@ const DATA = {"docs":["ZDR nega (bitno)","Nova pitanja NEGA (1. dec)","Najčeš�
 (function(){
 "use strict";
 /* ============ constants ============ */
-const VERSION = "4.4";
+const VERSION = "4.5";
 const PWA = true;   // true u verziji koja se instalira na telefon (docs/)
 const STANDALONE = !!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -1445,13 +1445,14 @@ function reportSheet(it){
   const s=sheet(`<h2 style="font-size:20px">Prijavi grešku u pitanju</h2><div class="li"><div class="q">${esc(it.q)}</div>${srcHTML(it)}</div>
     <div class="chips wrap" id="rr">${reasons.map((r,i)=>`<button class="chip" aria-pressed="${i===0}">${r}</button>`).join("")}</div>
     <textarea class="field" id="rn" placeholder="Šta nije u redu? (nije obavezno)"></textarea>
-    <div class="muted small">Prijava se čuva, pa pitanje može da se ispravi u sledećoj verziji aplikacije.</div>
+    <div class="muted small">${cntOn()||DB?"Prijava stiže autoru aplikacije, bez tvog imena. Pitanje se proverava u materijalu i ispravlja u sledećoj verziji.":"Prijava se čuva, pa pitanje može da se ispravi u sledećoj verziji aplikacije."}</div>
     <div class="grid2"><button class="btn" id="no">Otkaži</button><button class="btn primary" id="yes">Pošalji</button></div>`,"Prijava");
   s.querySelectorAll("#rr .chip").forEach((c,i)=>c.onclick=()=>{pickR=reasons[i];s.querySelectorAll("#rr .chip").forEach(x=>x.setAttribute("aria-pressed",String(x===c)))});
   s.querySelector("#no").onclick=()=>s.remove();
-  s.querySelector("#yes").onclick=async()=>{const note=s.querySelector("#rn").value.trim().slice(0,500); S.rep[it.id]={r:pickR,n:note,t:Date.now()}; save(); s.remove();
-    let sent=false; try{ if(DB){ await DB.collection("reports").doc(it.id+"-"+Date.now()).set({item:it.id,q:String(it.q).slice(0,300),reason:pickR,note,t:Date.now()}); sent=true } }catch(e){}
-    toast(sent?"Hvala! Prijava je poslata.":"Hvala! Prijava je sačuvana.")};
+  s.querySelector("#yes").onclick=async()=>{const note=s.querySelector("#rn").value.trim().slice(0,500); const r={r:pickR,n:note,t:Date.now()}; S.rep[it.id]=r; save(); s.remove();
+    let sent=false; if(cntOn()){ repQueue(it.id,r,VERSION); sent=repFlush(); if(!sent)gcLoad() }
+    try{ if(DB){ await DB.collection("reports").doc(it.id+"-"+r.t).set({item:it.id,q:String(it.q).slice(0,300),reason:pickR,note,t:r.t}); sent=true } }catch(e){}
+    toast(sent?"Hvala! Prijava je poslata.":cntOn()?"Hvala! Prijava je sačuvana i biće poslata čim se povežeš na internet.":"Hvala! Prijava je sačuvana.")};
   applyScript(s); document.body.appendChild(s);
 }
 function examSheet(back){
@@ -1636,7 +1637,7 @@ function restoreSheet(){
 /* ============ instalirana aplikacija: rad bez interneta i nove verzije ============ */
 function initPWA(){
   if(!PWA)return;
-  gcLoad(); setTimeout(()=>countUse(true),2500); window.addEventListener("online",()=>countUse(false));
+  gcLoad(); setTimeout(()=>countUse(true),2500); window.addEventListener("online",()=>{ countUse(false); if(!repFlush())gcLoad() });
   try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{}) }catch(e){}
   if(!("serviceWorker" in navigator)||(location.protocol!=="https:"&&location.hostname!=="localhost"))return;
   const ready=w=>{ if(document.querySelector(".upd"))return; const b=h(`<button class="upd">Nova verzija aplikacije je spremna · <b>Osveži</b></button>`); b.onclick=()=>{flush(); w.postMessage("skip"); b.remove()}; applyScript(b); document.body.appendChild(b) };
@@ -1655,7 +1656,23 @@ function initPWA(){
 const CNT_BASE="https://abacus.jasoncameron.dev/hit/drzavni-ispit-ksd966/", CNT_KEY="skr_cnt_v1", CNT_START="20261022";
 // GoatCounter (nalog ksd996): posete po danima, odakle ljudi dolaze, telefoni – bez kolačića i ličnih podataka
 const GC_URL="https://ksd996.goatcounter.com/count";
-function gcLoad(){ if(!cntOn()||document.querySelector("script[data-goatcounter]"))return; const s=document.createElement("script"); s.async=true; s.src="https://gc.zgo.at/count.js"; s.dataset.goatcounter=GC_URL; document.head.appendChild(s) }
+function gcLoad(){ if(!cntOn()||document.querySelector("script[data-goatcounter]"))return; const s=document.createElement("script"); s.async=true; s.src="https://gc.zgo.at/count.js"; s.dataset.goatcounter=GC_URL;
+  s.onload=()=>{repScan(); repFlush()}; s.onerror=()=>s.remove(); document.head.appendChild(s) }
+/* Prijave grešaka u pitanjima („Prijavi grešku”) idu u isti GoatCounter kao događaj, bez imena:
+   putanja prijava/<id pitanja>/<razlog>/<verzija>/<vreme>, naslov = razlog i napomena. Čita ih tools/prijave.py.
+   Red za slanje je na telefonu (skr_rep_v1), pa se prijava bez interneta pošalje kasnije; šalju se i ranije
+   prijave koje su ostale samo na telefonu (iz svih imena). */
+const REP_KEY="skr_rep_v1", REP_CODE={"Pogrešan tačan odgovor":"odgovor","Nejasno ili nepotpuno pitanje":"nejasno","Greška u tekstu":"tekst","Drugo":"drugo"};
+function repState(){ let o={}; try{o=JSON.parse(lsGet(REP_KEY)||"{}")||{}}catch(e){} o.q=Array.isArray(o.q)?o.q:[]; o.s=Array.isArray(o.s)?o.s:[]; return o }
+function repQueue(id,r,v){ if(!cntOn()||!r||!r.t)return; const o=repState(), k=id+"-"+r.t; if(o.s.includes(k)||o.q.some(x=>x.k===k))return;
+  o.q.push({k,i:id,r:String(r.r||""),n:String(r.n||"").slice(0,500),t:r.t,v}); lsSet(REP_KEY,JSON.stringify(o)) }
+function repScan(){ if(!cntOn())return; try{ Object.keys(PROF.list).forEach(slug=>{ const o=slug===PROF.active?S:readLocal(slug);
+  Object.entries((o&&o.rep)||{}).forEach(([id,r])=>repQueue(id,r,"ranije")) }) }catch(e){} }
+function repFlush(){ const gc=window.goatcounter; if(!cntOn()||navigator.onLine===false||!gc||typeof gc.count!=="function")return false;
+  const o=repState(); if(!o.q.length)return true;
+  for(const x of o.q){ try{ gc.count({path:"prijava/"+x.i+"/"+(REP_CODE[x.r]||"drugo")+"/"+(x.v||"ranije")+"/"+Number(x.t).toString(36),
+    title:((x.r||"Prijava")+(x.n?" – "+x.n:"")).slice(0,600), event:true}); o.s.push(x.k) }catch(e){ break } }
+  o.q=o.q.filter(x=>!o.s.includes(x.k)); lsSet(REP_KEY,JSON.stringify(o)); return !o.q.length }
 let cntBusy=false;
 function ymd(t){const d=new Date(t);return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")}
 async function cntHit(k){try{const r=await fetch(CNT_BASE+k,{cache:"no-store",credentials:"omit",referrerPolicy:"no-referrer"});return r.ok}catch(e){return false}}
